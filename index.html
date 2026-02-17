@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pokemon TCG Data Browser</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+    :root {
+      --bg: #f5f7fb;
+      --bg-gradient: radial-gradient(circle at 15% 15%, #ffe9c9, transparent 35%),
+        radial-gradient(circle at 85% 10%, #d8f4ff, transparent 40%),
+        radial-gradient(circle at 80% 90%, #ffd7ea, transparent 40%),
+        linear-gradient(135deg, #f6f8fb 0%, #eaf0ff 100%);
+      --panel: rgba(255, 255, 255, 0.82);
+      --panel-solid: #ffffff;
+      --text: #19212d;
+      --muted: #607088;
+      --accent: #0f7bff;
+      --accent-2: #ff7357;
+      --line: #d5dfef;
+      --shadow: 0 16px 40px rgba(24, 39, 75, 0.14);
+      --radius: 16px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      color: var(--text);
+      font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+      background: var(--bg);
+      background-image: var(--bg-gradient);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr) 420px;
+      gap: 18px;
+      padding: 18px;
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand {
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .set-filter-wrap {
+      padding: 12px 12px 0;
+    }
+
+    .search-input,
+    .control-select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel-solid);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .search-input:focus,
+    .control-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 123, 255, 0.15);
+    }
+
+    .set-list {
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 0 10px 12px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .set-btn {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.88);
+      width: 100%;
+      text-align: left;
+      padding: 10px;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      transition: transform 0.15s ease, border-color 0.2s ease, background-color 0.2s ease;
+      color: var(--text);
+    }
+
+    .set-btn:hover {
+      transform: translateY(-1px);
+      border-color: #b8c7e0;
+      background: #ffffff;
+    }
+
+    .set-btn.active {
+      border-color: var(--accent);
+      background: linear-gradient(140deg, rgba(15, 123, 255, 0.1), rgba(255, 255, 255, 1));
+    }
+
+    .set-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .set-name {
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.95rem;
+    }
+
+    .set-sub {
+      color: var(--muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .set-count {
+      font-size: 0.76rem;
+      border-radius: 99px;
+      border: 1px solid #d2deef;
+      padding: 4px 8px;
+      color: #3f5676;
+      background: #f9fbff;
+    }
+
+    .main {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .hero {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .hero p {
+      margin: 6px 0 0;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .hero-logo {
+      max-height: 42px;
+      width: auto;
+      opacity: 0.95;
+      object-fit: contain;
+    }
+
+    .controls {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) 150px;
+      gap: 10px;
+    }
+
+    .cards-grid {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px;
+      overflow: auto;
+      align-content: start;
+    }
+
+    .card {
+      border: 1px solid #d7e1f0;
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.2s ease;
+      box-shadow: 0 8px 20px rgba(27, 44, 85, 0.09);
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(27, 44, 85, 0.14);
+      border-color: #b8c9e5;
+    }
+
+    .card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 123, 255, 0.16), 0 12px 24px rgba(27, 44, 85, 0.14);
+    }
+
+    .card-image-wrap {
+      aspect-ratio: 245 / 342;
+      background: linear-gradient(160deg, #f2f6ff, #ffffff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .card-fallback {
+      color: #8093b0;
+      font-size: 0.78rem;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .card-body {
+      padding: 10px 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.77rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .json-panel {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .json-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .json-header h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .json-header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .mini-preview {
+      width: 52px;
+      height: 74px;
+      border-radius: 8px;
+      border: 1px solid #d7e1f0;
+      object-fit: cover;
+      background: #f4f8ff;
+      display: none;
+    }
+
+    .mini-preview.visible {
+      display: block;
+    }
+
+    .json-actions {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #1f3556;
+      border-radius: 10px;
+      font: inherit;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .btn:hover {
+      border-color: #b7c9e4;
+      background: #f6f9ff;
+    }
+
+    .json-view {
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: #d8f6ff;
+      background: linear-gradient(170deg, #11253f 0%, #183358 55%, #153456 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 0.84rem;
+      padding: 10px 14px;
+    }
+
+    .skeleton {
+      border-radius: 12px;
+      background: linear-gradient(90deg, #eff4ff 0%, #ffffff 45%, #eff4ff 100%);
+      background-size: 300% 100%;
+      animation: shimmer 1.4s infinite;
+      height: 265px;
+      border: 1px solid #dfe8f5;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+
+    @media (max-width: 1200px) {
+      .app {
+        grid-template-columns: 270px minmax(0, 1fr);
+      }
+
+      .json-panel {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 850px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        min-height: auto;
+      }
+
+      .cards-grid {
+        min-height: 52vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="panel sidebar">
+      <header class="brand">
+        <h1 class="title">Pokemon TCG Browser</h1>
+        <p class="subtitle">Browse sets and cards from local repository JSON.</p>
+      </header>
+      <div class="set-filter-wrap">
+        <input id="setFilter" class="search-input" type="search" placeholder="Filter sets by name or id">
+      </div>
+      <ul id="setList" class="set-list"></ul>
+    </aside>
+
+    <main class="panel main">
+      <section class="hero">
+        <div>
+          <h2 id="setTitle">Loading sets...</h2>
+          <p id="setMeta">Waiting for data</p>
+        </div>
+        <img id="setLogo" class="hero-logo" alt="" hidden>
+      </section>
+      <section class="controls">
+        <input id="cardSearch" class="search-input" type="search" placeholder="Search cards by name, number, type">
+        <select id="sortCards" class="control-select">
+          <option value="number-asc">Sort: Number A-Z</option>
+          <option value="number-desc">Sort: Number Z-A</option>
+          <option value="name-asc">Sort: Name A-Z</option>
+          <option value="name-desc">Sort: Name Z-A</option>
+        </select>
+      </section>
+      <section id="cardsGrid" class="cards-grid"></section>
+    </main>
+
+    <aside class="panel json-panel">
+      <header class="json-header">
+        <div>
+          <h3 id="jsonTitle">Raw Card JSON</h3>
+          <p id="jsonHint">Select a card to inspect its full object.</p>
+        </div>
+        <img id="miniPreview" class="mini-preview" alt="Selected card preview">
+      </header>
+      <div class="json-actions">
+        <button id="copyJsonBtn" class="btn" type="button">Copy JSON</button>
+      </div>
+      <pre id="jsonView" class="json-view">Click any card to see JSON.</pre>
+    </aside>
+  </div>
+
+  <script>
+    (() => {
+      const state = {
+        sets: [],
+        filteredSets: [],
+        selectedSetId: null,
+        cardCache: new Map(),
+        cards: [],
+        filteredCards: [],
+        selectedCardId: null
+      };
+
+      const setListEl = document.getElementById("setList");
+      const cardsGridEl = document.getElementById("cardsGrid");
+      const setTitleEl = document.getElementById("setTitle");
+      const setMetaEl = document.getElementById("setMeta");
+      const setLogoEl = document.getElementById("setLogo");
+      const setFilterEl = document.getElementById("setFilter");
+      const cardSearchEl = document.getElementById("cardSearch");
+      const sortCardsEl = document.getElementById("sortCards");
+      const jsonTitleEl = document.getElementById("jsonTitle");
+      const jsonHintEl = document.getElementById("jsonHint");
+      const jsonViewEl = document.getElementById("jsonView");
+      const miniPreviewEl = document.getElementById("miniPreview");
+      const copyJsonBtn = document.getElementById("copyJsonBtn");
+
+      function parseReleaseDate(value) {
+        const [year, month, day] = String(value || "").split("/");
+        if (!year || !month || !day) return 0;
+        return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+      }
+
+      function compareCardNumber(a, b) {
+        const av = String(a.number || "");
+        const bv = String(b.number || "");
+        return av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+      }
+
+      function showCardsLoading() {
+        cardsGridEl.innerHTML = "";
+        for (let i = 0; i < 10; i += 1) {
+          const skeleton = document.createElement("div");
+          skeleton.className = "skeleton";
+          cardsGridEl.appendChild(skeleton);
+        }
+      }
+
+      function renderSets() {
+        setListEl.innerHTML = "";
+        if (state.filteredSets.length === 0) {
+          const empty = document.createElement("li");
+          empty.className = "status";
+          empty.textContent = "No sets match that filter.";
+          setListEl.appendChild(empty);
+          return;
+        }
+
+        for (const set of state.filteredSets) {
+          const item = document.createElement("li");
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `set-btn${set.id === state.selectedSetId ? " active" : ""}`;
+          btn.dataset.setId = set.id;
+
+          const meta = document.createElement("span");
+          meta.className = "set-meta";
+          const name = document.createElement("span");
+          name.className = "set-name";
+          name.textContent = set.name;
+          const sub = document.createElement("span");
+          sub.className = "set-sub";
+          sub.textContent = `${set.series} | ${set.releaseDate} | ${set.id}`;
+          meta.appendChild(name);
+          meta.appendChild(sub);
+
+          const count = document.createElement("span");
+          count.className = "set-count";
+          count.textContent = `${set.total} cards`;
+
+          btn.appendChild(meta);
+          btn.appendChild(count);
+          btn.addEventListener("click", () => selectSet(set.id));
+          item.appendChild(btn);
+          setListEl.appendChild(item);
+        }
+      }
+
+      function getSelectedSet() {
+        return state.sets.find((s) => s.id === state.selectedSetId) || null;
+      }
+
+      function updateSetHeader(set) {
+        if (!set) return;
+        setTitleEl.textContent = `${set.name} (${set.id})`;
+        setMetaEl.textContent = `${set.series} series | Released ${set.releaseDate} | ${set.total} cards`;
+        if (set.images && set.images.logo) {
+          setLogoEl.hidden = false;
+          setLogoEl.src = set.images.logo;
+          setLogoEl.alt = `${set.name} logo`;
+        } else {
+          setLogoEl.hidden = true;
+          setLogoEl.src = "";
+          setLogoEl.alt = "";
+        }
+      }
+
+      function cardSearchText(card) {
+        const bits = [
+          card.name,
+          card.id,
+          card.number,
+          card.supertype,
+          (card.subtypes || []).join(" "),
+          (card.types || []).join(" "),
+          card.rarity,
+          card.artist
+        ];
+        return bits.filter(Boolean).join(" ").toLowerCase();
+      }
+
+      function applyCardFilters() {
+        const q = cardSearchEl.value.trim().toLowerCase();
+        const mode = sortCardsEl.value;
+        let cards = q ? state.cards.filter((card) => cardSearchText(card).includes(q)) : state.cards.slice();
+
+        if (mode === "number-asc") cards.sort(compareCardNumber);
+        if (mode === "number-desc") cards.sort((a, b) => compareCardNumber(b, a));
+        if (mode === "name-asc") cards.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        if (mode === "name-desc") cards.sort((a, b) => String(b.name || "").localeCompare(String(a.name || "")));
+
+        state.filteredCards = cards;
+        renderCards();
+      }
+
+      function renderCards() {
+        cardsGridEl.innerHTML = "";
+        const set = getSelectedSet();
+        if (set) {
+          setMetaEl.textContent = `${set.series} series | Released ${set.releaseDate} | Showing ${state.filteredCards.length} of ${state.cards.length} cards`;
+        }
+
+        if (state.filteredCards.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "status";
+          empty.textContent = "No cards match your search.";
+          cardsGridEl.appendChild(empty);
+          return;
+        }
+
+        const frag = document.createDocumentFragment();
+        for (const card of state.filteredCards) {
+          const article = document.createElement("article");
+          article.className = `card${card.id === state.selectedCardId ? " active" : ""}`;
+          article.dataset.cardId = card.id;
+
+          const imageUrl = card.images && (card.images.small || card.images.large);
+          const cardType = (card.types || []).join(", ") || card.supertype || "Unknown";
+          const subtitle = `#${card.number || "?"} | ${cardType}`;
+          const imageWrap = document.createElement("div");
+          imageWrap.className = "card-image-wrap";
+
+          if (imageUrl) {
+            const img = document.createElement("img");
+            img.className = "card-image";
+            img.src = imageUrl;
+            img.alt = card.name || "Card";
+            imageWrap.appendChild(img);
+          } else {
+            const fallback = document.createElement("div");
+            fallback.className = "card-fallback";
+            fallback.textContent = "No image available";
+            imageWrap.appendChild(fallback);
+          }
+
+          const body = document.createElement("div");
+          body.className = "card-body";
+          const title = document.createElement("h3");
+          title.className = "card-title";
+          title.textContent = card.name || "Unknown Card";
+          const sub1 = document.createElement("p");
+          sub1.className = "card-sub";
+          sub1.textContent = subtitle;
+          const sub2 = document.createElement("p");
+          sub2.className = "card-sub";
+          sub2.textContent = card.rarity || "Rarity unknown";
+
+          body.appendChild(title);
+          body.appendChild(sub1);
+          body.appendChild(sub2);
+          article.appendChild(imageWrap);
+          article.appendChild(body);
+          article.addEventListener("click", () => selectCard(card.id));
+          frag.appendChild(article);
+        }
+        cardsGridEl.appendChild(frag);
+      }
+
+      function selectCard(cardId) {
+        const card = state.cards.find((c) => c.id === cardId);
+        if (!card) return;
+        state.selectedCardId = cardId;
+        jsonTitleEl.textContent = `${card.name || "Card"} (${card.id || "no-id"})`;
+        jsonHintEl.textContent = "Raw object from the selected set file";
+        jsonViewEl.textContent = JSON.stringify(card, null, 2);
+
+        const previewUrl = card.images && (card.images.small || card.images.large);
+        if (previewUrl) {
+          miniPreviewEl.src = previewUrl;
+          miniPreviewEl.alt = card.name || "Card preview";
+          miniPreviewEl.classList.add("visible");
+        } else {
+          miniPreviewEl.src = "";
+          miniPreviewEl.alt = "";
+          miniPreviewEl.classList.remove("visible");
+        }
+        renderCards();
+      }
+
+      async function fetchJson(path) {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`Failed to load ${path} (${res.status})`);
+        return res.json();
+      }
+
+      async function loadCardsForSet(setId) {
+        if (state.cardCache.has(setId)) return state.cardCache.get(setId);
+        const cards = await fetchJson(`cards/en/${setId}.json`);
+        state.cardCache.set(setId, cards);
+        return cards;
+      }
+
+      async function selectSet(setId) {
+        if (!setId) return;
+        state.selectedSetId = setId;
+        state.selectedCardId = null;
+        renderSets();
+        updateSetHeader(getSelectedSet());
+        showCardsLoading();
+        jsonTitleEl.textContent = "Raw Card JSON";
+        jsonHintEl.textContent = "Select a card to inspect its full object.";
+        jsonViewEl.textContent = "Click any card to see JSON.";
+        miniPreviewEl.src = "";
+        miniPreviewEl.alt = "";
+        miniPreviewEl.classList.remove("visible");
+
+        try {
+          state.cards = await loadCardsForSet(setId);
+          applyCardFilters();
+        } catch (error) {
+          cardsGridEl.innerHTML = "";
+          const p = document.createElement("p");
+          p.className = "status";
+          p.textContent = `${error.message}. If you opened this page as file://, use a local web server instead.`;
+          cardsGridEl.appendChild(p);
+        }
+      }
+
+      function applySetFilter() {
+        const q = setFilterEl.value.trim().toLowerCase();
+        state.filteredSets = q
+          ? state.sets.filter((set) => `${set.name} ${set.id} ${set.series}`.toLowerCase().includes(q))
+          : state.sets.slice();
+        renderSets();
+      }
+
+      async function init() {
+        try {
+          const sets = await fetchJson("sets/en.json");
+          state.sets = sets.slice().sort((a, b) => parseReleaseDate(b.releaseDate) - parseReleaseDate(a.releaseDate));
+          state.filteredSets = state.sets.slice();
+          state.selectedSetId = state.sets.length > 0 ? state.sets[0].id : null;
+          renderSets();
+          if (state.selectedSetId) {
+            await selectSet(state.selectedSetId);
+          } else {
+            setTitleEl.textContent = "No sets found";
+            setMetaEl.textContent = "Could not locate set data";
+          }
+        } catch (error) {
+          setTitleEl.textContent = "Failed to load data";
+          setMetaEl.textContent = error.message;
+          setListEl.innerHTML = "";
+          const li = document.createElement("li");
+          li.className = "status";
+          li.textContent = `${error.message}. Run this with a web server from the repository root.`;
+          setListEl.appendChild(li);
+        }
+      }
+
+      setFilterEl.addEventListener("input", applySetFilter);
+      cardSearchEl.addEventListener("input", applyCardFilters);
+      sortCardsEl.addEventListener("change", applyCardFilters);
+      copyJsonBtn.addEventListener("click", async () => {
+        const text = jsonViewEl.textContent || "";
+        try {
+          await navigator.clipboard.writeText(text);
+          copyJsonBtn.textContent = "Copied";
+          setTimeout(() => {
+            copyJsonBtn.textContent = "Copy JSON";
+          }, 900);
+        } catch (_err) {
+          copyJsonBtn.textContent = "Copy failed";
+          setTimeout(() => {
+            copyJsonBtn.textContent = "Copy JSON";
+          }, 1100);
+        }
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>
