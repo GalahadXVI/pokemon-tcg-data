@@ -1,0 +1,9 @@
+{
+  "name": "pokemon-tcg-data-browser",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local browser for Pokemon TCG JSON data",
+  "scripts": {
+    "start": "node scripts/dev-server.mjs"
+  }
+}
